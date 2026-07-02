@@ -1,6 +1,6 @@
 # macportseda
 
-A local [MacPorts](https://www.macports.org/) port tree for EDA tools.  Tested on MacOS 13. (I tried the new MacOS and they used more power and did less)
+A local [MacPorts](https://www.macports.org/) port tree for EDA tools.  Tested on MacOS 13 and MacOS 15 (see the macOS 15 notes below). (I tried the new MacOS and they used more power and did less)
 This work is motivated by the fact that my needs that generally don't overlap with most communities.  
 I always felt bad contributing to macports because I'm not a very good at software engineering, and the lack of experience made me a bad collaborator.  I'm still poor at GIT.
 
@@ -134,6 +134,41 @@ Ports live under a category directory (`cad`) as MacPorts expects.
    GUI tools that use X11 (`xschem`, `magic`, `netgen-lvs`, `xcircuit`) need a
    running X server — install **XQuartz** (see the xschem notes). `klayout`
    (Qt6) and `skim-app` are native Cocoa and don't.
+
+## macOS 15 (Sequoia) notes
+
+The whole tree builds on macOS 15.3 / Xcode 16.2 with the following caveats
+(nothing here affects the macOS 13 machine):
+
+- **Dependency variants must match the macOS 13 setup** — MacPorts Portfiles
+  cannot force variants of their dependencies, and the macOS 15 defaults
+  differ. Before building the X11 GUI ports, make sure:
+  ```
+  sudo port upgrade --enforce-variants tk +x11 -quartz     # xschem needs X11 Tk
+  sudo port install gtk2 +quartz                            # gtkwave needs quartz gtk2
+  ```
+  **Do not pass `-x11` when enforcing gtk2 +quartz** — `--enforce-variants`
+  propagates the requested variants to the whole dependency tree and will strip
+  the x11 backend out of `cairo`/`pango`, which silently breaks every
+  already-built X11 port (xschem dies with
+  `Symbol not found: _cairo_xlib_surface_create`). `cairo` and `pango` must
+  stay `+quartz+x11` (both backends coexist in one library). If they get
+  switched, reactivate the fat builds, e.g.
+  `sudo port -f activate cairo @1.18.4_2+quartz+x11`.
+- **xcircuit** needed a real fix (in-tree): Xcode 16 clang turns
+  implicit-function-declaration / int-conversion into hard errors; the Portfile
+  now appends `-Wno-error=` for both (no-ops on the older clang).
+- **gcc13 from the binary packages is broken with CLT 16.2** (SDK 15.2): its
+  fixincluded `_stdio.h` references `_bounds.h`, which only exists in SDK
+  15.4+. Any pure-gcc C compile fails with
+  `fatal error: _bounds.h: No such file or directory` — this hits the
+  `trilinos-charon`/`charon` builds (their C compiler is gcc13 via openmpi).
+  Fix: rebuild gcc13 against the local SDK (`sudo port -N -s upgrade --force
+  gcc13`) or update the Command Line Tools to 16.3+. (`trilinos16`/`xyce` are
+  unaffected: they use Apple clang for C/C++ and gcc13 only for Fortran.)
+- **gtkwave** builds, but gtk2-quartz cannot even print `--version` without a
+  window server, so it cannot be smoke-tested over SSH — verify it from a
+  local GUI session.
 
 ## OpenSTA notes
 
@@ -327,10 +362,12 @@ Ports live under a category directory (`cad`) as MacPorts expects.
 
 ## vendored stock ports (gtkwave, xcircuit, iverilog, magic)
 
-- These four are **verbatim snapshots of the stock MacPorts ports** (Portfile +
+- These four are **snapshots of the stock MacPorts ports** (Portfile +
   any `files/` patches), copied in so this tree is a self-contained EDA catalog.
-  They are not modified; they simply shadow the stock ports because the local
-  `file://` source sits above the rsync line in `sources.conf`.
+  They shadow the stock ports because the local `file://` source sits above the
+  rsync line in `sources.conf`. Three are verbatim; **xcircuit carries one
+  local change** (the `-Wno-error` flags for Xcode 16 clang — see the macOS 15
+  notes; stock is still broken there as of 10.0.4-era snapshots).
 - This is a deliberate **snapshot/pin**, not a fork to maintain. Since I'm the
   sole user, I'd rather freeze a known-good revision than chase upstream — these
   intentionally won't pick up MacPorts version bumps until re-copied.
@@ -391,7 +428,12 @@ Ports live under a category directory (`cad`) as MacPorts expects.
 - The solver binary is `charon_mp.exe`; a `post-activate` hook symlinks it to
   `${prefix}/bin/charon` (with a `pre-deactivate` cleanup).
 - **Build-time caveat:** `trilinos16`'s serial stub `${prefix}/include/mpi.h`
-  shadows openmpi's real header during the compile, so `trilinos16` must be
-  deactivated for the build: `sudo port -f deactivate trilinos16` before, and
-  `sudo port activate trilinos16` after (rev-upgrade reactivates it anyway).
-  The same applies to building `trilinos-charon`.
+  shadows openmpi's real header during the compile. Both `charon` and
+  `trilinos-charon` now inject `files/openmpi-first.cmake` via
+  `CMAKE_PROJECT_TOP_LEVEL_INCLUDES`, which prepends openmpi's include dir to
+  the global search so the real `mpi.h` wins even with `trilinos16` active.
+  Deactivating `trilinos16` for the build (`sudo port -f deactivate trilinos16`
+  before, `sudo port activate trilinos16` after) is still the belt-and-braces
+  procedure — note that MacPorts' rev-upgrade can re-activate `trilinos16` on
+  its own mid-batch (it did so right after `trilinos-charon` finished
+  installing, which is what originally broke the follow-on charon build).

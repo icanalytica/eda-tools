@@ -54,6 +54,13 @@ patchfiles-append   patch-xcircuit-implicit-udrawxat.diff
 
 configure.cflags-append -Wno-return-type
 
+# Xcode 15/16 clang promotes these to hard errors by default; xcircuit's K&R-era
+# code trips both (undeclared X11 functions in tclxcircuit.c). Downgrade them
+# back to warnings, matching the behavior of the older clang on macOS 13 (where
+# these flags are accepted no-ops).
+configure.cflags-append -Wno-error=implicit-function-declaration \
+                        -Wno-error=int-conversion
+
 configure.args      --with-tcl=${prefix}/lib \
                     --with-tk=${prefix}/lib/tk-x11 \
                     --with-gs=${prefix}/bin/gs \

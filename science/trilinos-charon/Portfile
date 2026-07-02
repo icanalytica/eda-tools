@@ -163,7 +163,12 @@ configure.args-append \
     -DTPL_ENABLE_SuiteSparse=ON
 
 # =====================================================================
-# WORK IN PROGRESS - first cut, NOT yet build-verified.
+# Build-verified on macOS 15.3 / Xcode 16.2 (2026-07): full configure+build+
+# install into the private prefix. NOTE: gcc13 must not be the broken binary
+# package (see the macOS 15 notes in the README: _bounds.h / CLT 16.2), and
+# MacPorts' rev-upgrade can re-activate trilinos16 immediately after THIS
+# port's install completes — the openmpi-first.cmake shim is what keeps
+# later builds (charon) safe from the stub mpi.h.
 #
 # HDF5 is used SERIAL on purpose: the system hdf5/netcdf are serial and feed
 # the working trilinos16/xyce (Xyce) stack, which we don't want to perturb.

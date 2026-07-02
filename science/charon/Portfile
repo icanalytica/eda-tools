@@ -87,6 +87,7 @@ configure.args-append \
     -DCMAKE_CXX_STANDARD=17 \
     -DBUILD_SHARED_LIBS=ON \
     -DTPL_ENABLE_MPI=ON \
+    -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=${filespath}/openmpi-first.cmake \
     -DTPL_ENABLE_BLAS=ON \
     -DTPL_ENABLE_LAPACK=ON \
     -DTPL_ENABLE_Boost=ON \
@@ -166,11 +167,17 @@ pre-deactivate {
 #
 # BUILD REQUIREMENT: the serial trilinos16 port installs a stub
 # ${prefix}/include/mpi.h that shadows openmpi's real header for some packages
-# (STK/SEACAS). As with trilinos-charon, deactivate trilinos16 for the build:
+# (STK/SEACAS). The CMAKE_PROJECT_TOP_LEVEL_INCLUDES shim above
+# (openmpi-first.cmake, same trick as trilinos-charon) prepends openmpi's
+# include dir to the global search so the real mpi.h wins even with trilinos16
+# active. Belt and braces: deactivating trilinos16 for the build still avoids
+# the shadowing entirely:
 #     sudo port -f deactivate trilinos16
 #     sudo port install charon
 #     sudo port activate trilinos16
-# (rev-upgrade auto-reactivates trilinos16 afterward anyway.)
+# (rev-upgrade auto-reactivates trilinos16 afterward anyway — note it can do so
+# DURING an earlier install in the same batch, e.g. right after trilinos-charon
+# finishes, which is exactly when the shim is needed.)
 # =====================================================================
 
 livecheck.type      none

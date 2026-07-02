@@ -1,0 +1,74 @@
+# -*- coding: utf-8; mode: tcl; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- vim:fenc=utf-8:ft=tcl:et:sw=4:ts=4:sts=4
+
+PortSystem          1.0
+
+name                eda-icall
+version             1.0
+revision            0
+categories          cad
+license             MIT
+supported_archs     noarch
+platforms           {darwin any}
+maintainers         {icanalytica.com:degnan @bpdegnan} openmaintainer
+homepage            https://github.com/bpdegnan/macportseda
+
+description         Metaport: the full open-source sky130 EDA toolchain
+long_description    Installs everything in this tree needed for SkyWater \
+                    sky130 IC work: digital RTL-to-GDS (yosys, sby, iverilog, \
+                    verilator, OpenSTA, openroad + the LibreLane-pinned \
+                    openroad-ll), analog design and simulation (xschem, \
+                    ngspice, xyce, openvaf), layout and physical verification \
+                    (magic, netgen-lvs, klayout, xcircuit), waveforms \
+                    (gtkwave), the volare PDK manager, and the Skim EPS/PDF \
+                    viewer. Board-level (kicad) and TCAD (charon) are separate.
+
+# Metaport: nothing to fetch or build.
+distfiles
+use_configure       no
+build {}
+
+depends_lib-append \
+    port:yosys \
+    port:sby \
+    port:iverilog \
+    port:verilator \
+    port:OpenSTA \
+    port:openroad \
+    port:openroad-ll \
+    port:xschem \
+    port:ngspice \
+    port:xyce \
+    port:openvaf \
+    port:magic \
+    port:netgen-lvs \
+    port:klayout \
+    port:xcircuit \
+    port:gtkwave \
+    port:py-volare \
+    port:skim-app
+
+destroot {
+    xinstall -d ${destroot}${prefix}/share/doc/${name}
+    system "echo '${name} ${version}: metaport for the macportseda sky130 toolchain.' \
+        > ${destroot}${prefix}/share/doc/${name}/README"
+}
+
+notes "
+eda-icall pulls in the MacPorts side of the sky130 toolchain. Things it
+cannot do for you (see the macportseda README for details):
+
+  1. Dependency variants must be right BEFORE the X11/GUI tools build:
+       tk +x11 (not +quartz), gtk2 +quartz, cairo/pango +quartz+x11.
+  2. The LibreLane RTL-to-GDS driver is a Python venv, not a port:
+       uv venv --python 3.12 ~/.venvs/librelane
+       ~/.venvs/librelane/bin/pip install librelane
+     plus the 'librelane' wrapper script (PATH: venv, then
+     ${prefix}/libexec/openroad-ll/bin, then ${prefix}/bin) and
+     PDK_ROOT=~/.volare. LibreLane needs yosys built with +pyosys.
+  3. Source builds of openroad/openroad-ll need the shadowing gates
+     (deactivate boost spdlog protobuf3-cpp OpenSTA; reactivate after).
+     Binary-less first installs of this metaport hit that on fresh machines.
+  4. X11 GUIs (xschem, magic, netgen-lvs, xcircuit) need XQuartz.
+"
+
+livecheck.type      none

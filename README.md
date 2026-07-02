@@ -12,6 +12,8 @@ Tested on my macOS 13 and macOS 15 machines.
 ```
 macportseda/
 └── cad/
+    ├── eda-icall/      # METAPORT: installs the whole sky130 toolchain
+    │   └── Portfile
     ├── OpenSTA/
     │   └── Portfile
     ├── cudd/
@@ -47,7 +49,9 @@ science/
 │   └── Portfile
 ├── iverilog/          # vendored stock snapshot
 │   └── Portfile
-├── magic/             # vendored stock snapshot
+├── verilator/         # vendored stock snapshot (LibreLane lint step)
+│   └── Portfile
+├── magic/             # vendored snapshot, bumped to 8.3.660 for LibreLane
 │   └── Portfile
 ├── trilinos16/         # serial Trilinos subset for Xyce
 │   └── Portfile
@@ -97,7 +101,18 @@ Ports live under a category directory (`cad`) as MacPorts expects.
    portindex
    ```
 
-3. Install. Each port is `sudo port install <name>`. Quick reference:
+3. Install. For the full sky130 toolchain in one shot:
+
+   ```
+   sudo port install eda-icall
+   ```
+
+   (a metaport pulling yosys, sby, iverilog, verilator, OpenSTA, openroad,
+   openroad-ll, xschem, ngspice, xyce, openvaf, magic, netgen-lvs, klayout,
+   xcircuit, gtkwave, py-volare, skim-app — kicad and charon/TCAD stay
+   separate). Mind the variant prerequisites in the macOS 15 notes and the
+   build-time gates below if ports build from source; `port notes eda-icall`
+   summarizes them. Or install ports individually:
 
    | Port | Command | Notes |
    |------|---------|-------|
@@ -135,6 +150,28 @@ Ports live under a category directory (`cad`) as MacPorts expects.
    GUI tools that use X11 (`xschem`, `magic`, `netgen-lvs`, `xcircuit`) need a
    running X server — install **XQuartz** (see the xschem notes). `klayout`
    (Qt6) and `skim-app` are native Cocoa and don't.
+
+## distfiles archive (offline / standalone insurance)
+
+- `distfiles/` (gitignored — 2.4+ GB, and GitHub hard-rejects files >100 MB,
+  so it can never live in git) holds a copy of every source tarball the tree's
+  ports fetch. Upstream URLs rot: lemon.cs.elte.hu already 404s (the eda-lemon
+  port gained a Spack mirror fallback) and the charon tarball lives at a
+  fragile sandia.gov uploads URL.
+- MacPorts uses an already-present, checksum-verified distfile without
+  touching the network, so restoring on any machine is just:
+  ```
+  sudo rsync -a distfiles/ /opt/local/var/macports/distfiles/
+  ```
+  then install normally. The Portfile checksums authenticate every file, so
+  the archive needs no special trust.
+- To (re)populate after adding or bumping ports:
+  ```
+  sudo port mirror <portname...>     # fetches into /opt/local/var/macports/distfiles
+  rsync -a /opt/local/var/macports/distfiles/<portname> distfiles/
+  ```
+- Keep a copy of `distfiles/` with your normal backups (it is NOT pushed with
+  the repo).
 
 ## macOS 15 (Sequoia) notes
 
@@ -206,6 +243,20 @@ The whole tree builds on macOS 15.3 / Xcode 16.2 with the following caveats:
   is untouched (the flow does STA through openroad).
 - OpenLane **1** was skipped deliberately: Docker/Makefile-first, legacy,
   fully superseded by LibreLane for this use case.
+
+## cocotb notes (Python testbenches)
+
+- **cocotb 2.0** for simulation-based digital verification (complements sby's
+  formal): Python coroutine testbenches driving the MacPorts simulators.
+  Like LibreLane it's a Python package, not a port: uv venv at
+  `~/.venvs/cocotb` (python 3.12, `pip install cocotb pytest`).
+- Verified against both installed simulators (a counter testbench passes on
+  **icarus** and **verilator**). Remember a `` `timescale `` directive in the
+  HDL — icarus defaults to 1 s precision and cocotb's Clock errors out.
+- Preferred workflow is the cocotb 2.x Python runner
+  (`cocotb_tools.runner.get_runner("icarus"|"verilator")`) run with
+  `~/.venvs/cocotb/bin/python`; a `cocotb-config` shim in `~/.local/bin`
+  covers the legacy Makefile flow.
 
 ## OpenSTA notes
 
@@ -397,14 +448,20 @@ The whole tree builds on macOS 15.3 / Xcode 16.2 with the following caveats:
   no `kicad-doc-10.0.4`; KiCad's Help menu uses the online docs instead.
 - See [[kicad-port-facts]] in memory for the full blow-by-blow.
 
-## vendored stock ports (gtkwave, xcircuit, iverilog, magic)
+## vendored stock ports (gtkwave, xcircuit, iverilog, magic, verilator)
 
-- These four are **snapshots of the stock MacPorts ports** (Portfile +
+- These five are **snapshots of the stock MacPorts ports** (Portfile +
   any `files/` patches), copied in so this tree is a self-contained EDA catalog.
   They shadow the stock ports because the local `file://` source sits above the
-  rsync line in `sources.conf`. Three are verbatim; **xcircuit carries one
-  local change** (the `-Wno-error` flags for Xcode 16 clang — see the macOS 15
-  notes; stock is still broken there as of 10.0.4-era snapshots).
+  rsync line in `sources.conf`. gtkwave, iverilog and verilator are verbatim;
+  two carry local changes:
+  - **xcircuit**: `-Wno-error` flags for Xcode 16 clang (see the macOS 15
+    notes; stock is still broken there).
+  - **magic**: bumped to **8.3.660** (LibreLane's magic scripts need its
+    `units` command; stock MacPorts was at 8.3.508) plus a `gsed` fix for the
+    GNU-sed `-i` usage in 8.3.660's depend rule.
+- **verilator** (5.028) was vendored for the LibreLane flow's lint step; the
+  version matches LibreLane's own nix pin.
 - This is a deliberate **snapshot/pin**, not a fork to maintain. Since I'm the
   sole user, I'd rather freeze a known-good revision than chase upstream — these
   intentionally won't pick up MacPorts version bumps until re-copied.
@@ -415,7 +472,9 @@ The whole tree builds on macOS 15.3 / Xcode 16.2 with the following caveats:
   ```
 - `gtkwave` has historically been finicky to build here, which is exactly why
   pinning a working revision in-tree is worthwhile.
-- `ngspice` is deliberately **left on stock MacPorts** (not vendored).
+- `ngspice` and `openEMS` are deliberately **left on stock MacPorts** (not
+  vendored). Both are used here occasionally; neither is pinned by any flow,
+  so tracking stock is fine.
 
 ## xschem notes
 

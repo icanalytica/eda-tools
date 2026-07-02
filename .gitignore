@@ -7,4 +7,6 @@ PortIndex.quick
 Verifying
 notes.txt
 .*
-
+distfiles/
+*/work
+**/work

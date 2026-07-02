@@ -20,7 +20,12 @@ long_description    LEMON (Library for Efficient Modeling and Optimization in \
 
 homepage            https://lemon.cs.elte.hu/
 
-master_sites        https://lemon.cs.elte.hu/pub/sources/
+# lemon.cs.elte.hu is frequently down/404. Fallback: Spack's public source
+# mirror stores the identical tarball keyed by its sha256; the trailing `?x=`
+# absorbs the distfile name MacPorts appends (S3 ignores the query param), and
+# the checksums below verify it is the same file.
+master_sites        https://lemon.cs.elte.hu/pub/sources/ \
+                    https://mirror.spack.io/_source-cache/archive/71/71b7c725f4c0b4a8ccb92eb87b208701586cf7a96156ebd821ca3ed855bad3c8.tar.gz?x=
 distfiles           lemon-${version}.tar.gz
 worksrcdir          lemon-${version}
 

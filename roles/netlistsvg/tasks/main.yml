@@ -1,0 +1,93 @@
+---
+- name: Ensure supported OS family
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] in ['RedHat', 'Darwin']
+    fail_msg: >-
+      icanalytica.eda.netlistsvg supports RedHat-family Linux and macOS.
+      Detected: {{ ansible_facts['os_family'] }}.
+
+- name: Include OS family vars
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] | lower }}.yml"
+
+- name: Install node/npm (dnf)
+  ansible.builtin.dnf:
+    name: "{{ netlistsvg_packages }}"
+    state: present
+  become: true
+  when: ansible_facts['os_family'] == 'RedHat'
+
+# Homebrew refuses to run as root, so no become here.
+- name: Install node/npm (Homebrew)
+  community.general.homebrew:
+    name: "{{ netlistsvg_packages }}"
+    state: present
+  when: ansible_facts['os_family'] == 'Darwin'
+
+- name: Install netlistsvg into the EDA prefix
+  community.general.npm:
+    name: netlistsvg
+    version: "{{ netlistsvg_version }}"
+    global: true
+    executable: "npm --prefix {{ netlistsvg_npm_prefix }}"
+  become: true
+
+# Verification renders a real (minimal) yosys-JSON netlist to SVG.
+- name: Verify netlistsvg
+  block:
+    - name: Create netlistsvg verify directory
+      ansible.builtin.file:
+        path: "{{ eda_src_root }}/netlistsvg/verify"
+        state: directory
+        mode: "0755"
+      become: true
+
+    - name: Write netlistsvg smoke-test netlist
+      ansible.builtin.copy:
+        dest: "{{ eda_src_root }}/netlistsvg/verify/and.json"
+        mode: "0644"
+        content: |
+          {
+            "modules": {
+              "and_gate": {
+                "ports": {
+                  "a": {"direction": "input", "bits": [2]},
+                  "b": {"direction": "input", "bits": [3]},
+                  "y": {"direction": "output", "bits": [4]}
+                },
+                "cells": {
+                  "u1": {
+                    "type": "$and",
+                    "port_directions": {
+                      "A": "input", "B": "input", "Y": "output"
+                    },
+                    "connections": {"A": [2], "B": [3], "Y": [4]}
+                  }
+                }
+              }
+            }
+          }
+      become: true
+
+    - name: Render smoke-test netlist to SVG
+      ansible.builtin.command: >-
+        {{ netlistsvg_npm_prefix }}/bin/netlistsvg and.json -o and.svg
+      args:
+        chdir: "{{ eda_src_root }}/netlistsvg/verify"
+      register: netlistsvg_render
+      changed_when: false
+      become: true
+
+    - name: Read rendered SVG
+      ansible.builtin.slurp:
+        path: "{{ eda_src_root }}/netlistsvg/verify/and.svg"
+      register: netlistsvg_svg
+      become: true
+
+    - name: Assert netlistsvg produced an SVG
+      ansible.builtin.assert:
+        that:
+          - "'<svg' in (netlistsvg_svg.content | b64decode)"
+        fail_msg: >-
+          netlistsvg {{ netlistsvg_version }} installed but did not render
+          an SVG: {{ netlistsvg_render.stdout }} {{ netlistsvg_render.stderr }}

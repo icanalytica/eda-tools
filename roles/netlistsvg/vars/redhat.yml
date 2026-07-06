@@ -1,0 +1,6 @@
+---
+# AppStream nodejs supplies node + npm; netlistsvg runs on any maintained
+# node release.
+netlistsvg_packages:
+  - nodejs
+  - npm

@@ -1,0 +1,14 @@
+---
+# netlistsvg renders yosys JSON netlists as SVG schematics. Nice-to-have
+# (not part of the required toolchain). Installed from the npm registry,
+# pinned to an exact version; the top-level package is pinned but npm
+# resolves transitive dependencies per its package.json ranges — acceptable
+# for an optional visualization tool (the old MacPorts port vendored the
+# entire flat dependency tree to avoid npm altogether; not worth carrying
+# forward).
+netlistsvg_version: "1.0.2"
+
+# npm --prefix here installs the package under {{ eda_prefix }}/lib/
+# node_modules with the bin link at {{ eda_prefix }}/bin/netlistsvg, keeping
+# it inside the EDA prefix instead of the system npm root.
+netlistsvg_npm_prefix: "{{ eda_prefix }}"

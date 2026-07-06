@@ -1,0 +1,4 @@
+---
+# Homebrew node ships npm with it.
+netlistsvg_packages:
+  - node

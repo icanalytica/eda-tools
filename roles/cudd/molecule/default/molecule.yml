@@ -1,0 +1,18 @@
+---
+driver:
+  name: docker
+platforms:
+  - name: geerlingguy-rockylinux9
+    image: "geerlingguy/docker-rockylinux9-ansible:latest"
+    pre_build_image: true
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      # .molecule/ holds an ansible_collections/icanalytica/eda symlink back to
+      # the repo root, so FQCN role references resolve against the working tree.
+      collections_path: "${MOLECULE_PROJECT_DIRECTORY}/../../.molecule:${HOME}/.ansible/collections"
+      roles_path: "${MOLECULE_PROJECT_DIRECTORY}/..:${HOME}/.ansible/roles"
+      deprecation_warnings: false
+verifier:
+  name: testinfra

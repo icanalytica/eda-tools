@@ -1,0 +1,101 @@
+---
+- name: Ensure cudd build root exists
+  ansible.builtin.file:
+    path: "{{ cudd_build_root }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Stage cudd tarball from controller
+  ansible.builtin.copy:
+    src: "{{ cudd_source_url | urlsplit('path') }}"
+    dest: "{{ cudd_source_archive }}"
+    mode: "0644"
+    force: false
+  when:
+    - (cudd_source_url | urlsplit('scheme') | lower) == 'file'
+  become: true
+
+- name: Download cudd source tarball
+  ansible.builtin.get_url:
+    url: "{{ cudd_source_url }}"
+    dest: "{{ cudd_source_archive }}"
+    mode: "0644"
+    checksum: "{{ cudd_checksum }}"
+  when:
+    - (cudd_source_url | urlsplit('scheme') | lower) != 'file'
+  become: true
+
+- name: Check cudd install stamp
+  ansible.builtin.stat:
+    path: "{{ cudd_install_stamp }}"
+  register: cudd_stamp_stat
+  become: true
+
+- name: Determine if cudd build is needed
+  ansible.builtin.set_fact:
+    cudd_build_needed: >-
+      {{ (not cudd_stamp_stat.stat.exists) or (cudd_force_rebuild | bool) }}
+
+- name: Remove previous cudd extraction
+  ansible.builtin.command: "rm -rf {{ cudd_source_dir }}"
+  args:
+    removes: "{{ cudd_source_dir }}"
+  when: cudd_build_needed | bool
+  become: true
+
+- name: Extract cudd source
+  ansible.builtin.unarchive:
+    src: "{{ cudd_source_archive }}"
+    dest: "{{ cudd_build_root }}"
+    remote_src: true
+    creates: "{{ cudd_source_dir }}/configure"
+  when: cudd_build_needed | bool
+  become: true
+
+- name: Configure cudd
+  ansible.builtin.command: "./configure {{ cudd_configure_flags | join(' ') }}"
+  args:
+    chdir: "{{ cudd_source_dir }}"
+    creates: "{{ cudd_source_dir }}/config.status"
+  when: cudd_build_needed | bool
+  become: true
+
+- name: Build cudd
+  ansible.builtin.command: "make -j {{ cudd_make_jobs }}"
+  args:
+    chdir: "{{ cudd_source_dir }}"
+    creates: "{{ cudd_source_dir }}/cudd/libcudd.la"
+  when: cudd_build_needed | bool
+  become: true
+
+- name: Clear cudd install stamp before reinstall
+  ansible.builtin.file:
+    path: "{{ cudd_install_stamp }}"
+    state: absent
+  when: cudd_build_needed | bool
+  become: true
+
+- name: Install cudd
+  ansible.builtin.command:
+    cmd: make install
+    chdir: "{{ cudd_source_dir }}"
+  args:
+    creates: "{{ cudd_install_stamp }}"
+  when: cudd_build_needed | bool
+  become: true
+  notify: ldconfig
+
+- name: Record cudd install stamp
+  ansible.builtin.copy:
+    content: "{{ cudd_version }}\n"
+    dest: "{{ cudd_install_stamp }}"
+    mode: "0644"
+    force: false
+  when: cudd_build_needed | bool
+  become: true
+
+# The verify block compiles against the fresh library, so the linker cache
+# must be current before we get there.
+- name: Flush handlers so ldconfig runs before verification
+  ansible.builtin.meta: flush_handlers

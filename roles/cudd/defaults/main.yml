@@ -1,0 +1,36 @@
+---
+# CUDD 3.0.0 is the last upstream release and the version OpenSTA's
+# FindCUDD.cmake is tested against. Bump cudd_version and cudd_checksum
+# together — never one without the other.
+cudd_version: "3.0.0"
+cudd_checksum: "sha256:ce2c41c000f4374868ee4d713283a35d3d975a96f1c6f3bcfbee96e79eeb4560"
+
+# cuddorg/cudd carries two tags that collide on the short ref (3.0.0 and
+# cudd-3.0.0), so GitHub's short archive URL (archive/3.0.0.tar.gz) returns an
+# "ambiguous ref" error page rather than a tarball, and the release asset
+# unpacks into a doubled cudd-cudd-3.0.0 directory. Fetch the fully-qualified
+# refs/tags tarball instead; it extracts cleanly to cudd-3.0.0 and ships a
+# committed ./configure.
+cudd_archive_name: "cudd-{{ cudd_version }}.tar.gz"
+cudd_upstream_url: "https://github.com/cuddorg/cudd/archive/refs/tags/{{ cudd_version }}.tar.gz"
+cudd_source_url: >-
+  {{ (eda_mirror_base ~ '/' ~ cudd_archive_name)
+     if (eda_mirror_base | default('') | length > 0)
+     else cudd_upstream_url }}
+
+cudd_build_root: "{{ eda_src_root }}/cudd"
+cudd_source_archive: "{{ cudd_build_root }}/{{ cudd_archive_name }}"
+cudd_source_dir: "{{ cudd_build_root }}/cudd-{{ cudd_version }}"
+cudd_install_stamp: "{{ cudd_build_root }}/.installed-{{ cudd_version }}"
+
+# Build the shared library plus the dddmp and C++ object interfaces so the
+# package is useful to a range of EDA consumers. OpenSTA itself only needs
+# the C API (cudd.h), which is installed into {{ eda_prefix }}/include.
+cudd_configure_flags:
+  - "--prefix={{ eda_prefix }}"
+  - --enable-shared
+  - --enable-dddmp
+  - --enable-obj
+
+cudd_make_jobs: "{{ eda_make_jobs }}"
+cudd_force_rebuild: false

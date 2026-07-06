@@ -1,0 +1,103 @@
+---
+- name: Ensure supported OS family
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] in ['RedHat', 'Darwin']
+    fail_msg: >-
+      icanalytica.eda.cudd supports RedHat-family Linux and macOS.
+      Detected: {{ ansible_facts['os_family'] }}.
+
+- name: Include OS family vars
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] | lower }}.yml"
+
+- name: Install cudd build dependencies (dnf)
+  ansible.builtin.dnf:
+    name: "{{ cudd_packages }}"
+    state: present
+  become: true
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - cudd_packages | length > 0
+
+# Homebrew refuses to run as root, so no become here.
+- name: Install cudd build dependencies (Homebrew)
+  community.general.homebrew:
+    name: "{{ cudd_packages }}"
+    state: present
+  when:
+    - ansible_facts['os_family'] == 'Darwin'
+    - cudd_packages | length > 0
+
+- name: Build and install cudd
+  ansible.builtin.include_tasks: cudd.yml
+
+# CUDD is a library, so "run the real tool" means compiling a small program
+# against the installed cudd.h/libcudd and evaluating an actual BDD: the DAG
+# for (x AND y) must have exactly 3 nodes and the manager must report zero
+# leaked references. This catches broken headers, unresolvable symbols, and
+# runtime-linker misconfiguration in one shot.
+- name: Verify cudd
+  block:
+    - name: Create cudd verify directory
+      ansible.builtin.file:
+        path: "{{ cudd_build_root }}/verify"
+        state: directory
+        mode: "0755"
+      become: true
+
+    - name: Write cudd BDD smoke test source
+      ansible.builtin.copy:
+        dest: "{{ cudd_build_root }}/verify/cudd_smoke.c"
+        mode: "0644"
+        content: |
+          #include <stdio.h>
+          #include "cudd.h"
+
+          int main(void)
+          {
+            DdManager *m = Cudd_Init(0, 0, CUDD_UNIQUE_SLOTS,
+                                     CUDD_CACHE_SLOTS, 0);
+            DdNode *x = Cudd_bddNewVar(m);
+            DdNode *y = Cudd_bddNewVar(m);
+            DdNode *f = Cudd_bddAnd(m, x, y);
+            Cudd_Ref(f);
+            int size = Cudd_DagSize(f);
+            Cudd_RecursiveDeref(m, f);
+            int leaked = Cudd_CheckZeroRef(m);
+            Cudd_Quit(m);
+            if (size == 3 && leaked == 0) {
+              printf("cudd-ok\n");
+              return 0;
+            }
+            printf("cudd-broken size=%d leaked=%d\n", size, leaked);
+            return 1;
+          }
+      become: true
+
+    - name: Compile cudd BDD smoke test
+      ansible.builtin.command: >-
+        cc -o cudd_smoke cudd_smoke.c
+        -I{{ eda_prefix }}/include
+        -L{{ eda_prefix }}/lib -lcudd
+      args:
+        chdir: "{{ cudd_build_root }}/verify"
+      changed_when: false
+      become: true
+
+    - name: Run cudd BDD smoke test
+      ansible.builtin.command: ./cudd_smoke
+      args:
+        chdir: "{{ cudd_build_root }}/verify"
+      environment:
+        LD_LIBRARY_PATH: "{{ eda_prefix }}/lib"
+      register: cudd_smoke
+      changed_when: false
+      become: true
+
+    - name: Assert cudd BDD smoke test passed
+      ansible.builtin.assert:
+        that:
+          - "'cudd-ok' in cudd_smoke.stdout"
+        fail_msg: >-
+          cudd {{ cudd_version }} installed but the BDD smoke test failed:
+          {{ cudd_smoke.stdout }} {{ cudd_smoke.stderr }}

@@ -1,0 +1,82 @@
+---
+- name: Ensure supported OS family
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] in ['RedHat', 'Darwin']
+    fail_msg: >-
+      icanalytica.eda.opensta supports RedHat-family Linux and macOS.
+      Detected: {{ ansible_facts['os_family'] }}.
+
+- name: Include OS family vars
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] | lower }}.yml"
+
+- name: Install opensta build dependencies (dnf)
+  ansible.builtin.dnf:
+    name: "{{ opensta_packages }}"
+    state: present
+  become: true
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - opensta_packages | length > 0
+
+# Homebrew refuses to run as root, so no become here.
+- name: Install opensta build dependencies (Homebrew)
+  community.general.homebrew:
+    name: "{{ opensta_packages }}"
+    state: present
+  when:
+    - ansible_facts['os_family'] == 'Darwin'
+    - opensta_packages | length > 0
+
+- name: Build and install opensta
+  ansible.builtin.include_tasks: opensta.yml
+
+# Verification runs the real sta binary twice: once for the version string,
+# once with a Tcl script that requires the swig-generated Tcl bindings to
+# have loaded (the common way a bad build fails while still producing a
+# binary that starts).
+- name: Verify opensta
+  block:
+    - name: Check sta version
+      ansible.builtin.command: "{{ eda_prefix }}/bin/sta -version"
+      register: opensta_version_out
+      changed_when: false
+
+    - name: Assert sta reports the pinned version
+      ansible.builtin.assert:
+        that:
+          - opensta_version in opensta_version_out.stdout
+        fail_msg: >-
+          Expected sta -version to report {{ opensta_version }},
+          got: {{ opensta_version_out.stdout }}
+
+    - name: Write opensta Tcl smoke script
+      ansible.builtin.copy:
+        dest: "{{ opensta_build_root }}/verify.tcl"
+        mode: "0644"
+        content: |
+          # Fails unless the swig-generated Tcl command layer registered.
+          foreach cmd {read_liberty read_verilog report_checks} {
+            if {[info commands $cmd] eq ""} {
+              puts "sta-missing-command: $cmd"
+              exit 1
+            }
+          }
+          puts "sta-ok"
+          exit 0
+      become: true
+
+    - name: Run opensta Tcl smoke script
+      ansible.builtin.command: >-
+        {{ eda_prefix }}/bin/sta -no_init -no_splash -exit
+        {{ opensta_build_root }}/verify.tcl
+      register: opensta_smoke
+      changed_when: false
+
+    - name: Assert opensta Tcl smoke script passed
+      ansible.builtin.assert:
+        that:
+          - "'sta-ok' in opensta_smoke.stdout"
+        fail_msg: >-
+          OpenSTA installed but its Tcl command layer is broken:
+          {{ opensta_smoke.stdout }} {{ opensta_smoke.stderr }}

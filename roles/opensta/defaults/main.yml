@@ -1,0 +1,40 @@
+---
+# OpenSTA (parallaxsw) does not publish git tags or GitHub releases, so the
+# source is pinned to a specific commit on master. opensta_version is the
+# project() version declared in CMakeLists.txt at that commit — informational
+# only; the commit is the real pin. When updating, bump the commit, version
+# and checksum together.
+opensta_version: "3.1.0"
+opensta_commit: "bfdd2be0ee6214115b20cacdc0a071ca3c737fbb"
+opensta_checksum: "sha256:1e90d957b3f3bfb1ca03ca4a49b2643cf42b3c6e32c11c5051df5df69187561d"
+
+opensta_archive_name: "OpenSTA-{{ opensta_commit }}.tar.gz"
+opensta_upstream_url: "https://github.com/parallaxsw/OpenSTA/archive/{{ opensta_commit }}.tar.gz"
+opensta_source_url: >-
+  {{ (eda_mirror_base ~ '/' ~ opensta_archive_name)
+     if (eda_mirror_base | default('') | length > 0)
+     else opensta_upstream_url }}
+
+opensta_build_root: "{{ eda_src_root }}/opensta"
+opensta_source_archive: "{{ opensta_build_root }}/{{ opensta_archive_name }}"
+opensta_source_dir: "{{ opensta_build_root }}/OpenSTA-{{ opensta_commit }}"
+opensta_install_stamp: "{{ opensta_build_root }}/.installed-{{ opensta_commit }}"
+
+# CUDD improves conditional-arc, constant- and power-propagation handling.
+# The cudd role installs cudd.h into {{ eda_prefix }}/include and libcudd
+# into {{ eda_prefix }}/lib, which is exactly where OpenSTA's FindCUDD.cmake
+# looks when handed -DCUDD_DIR (hence the meta-dependency on cudd).
+#
+# Tcl readline support is forced OFF so the build does not silently link a
+# tclreadline that happens to be installed without being declared; it only
+# matters for interactive `sta` shells, not batch/scripted runs.
+opensta_cmake_args:
+  - "-DCMAKE_INSTALL_PREFIX={{ eda_prefix }}"
+  - "-DCMAKE_BUILD_TYPE=Release"
+  - "-DCUDD_DIR={{ eda_prefix }}"
+  - "-DUSE_TCL_READLINE=OFF"
+
+# OS-specific additions (Homebrew tool/Tcl paths on macOS) come from
+# vars/<os_family>.yml as opensta_cmake_args_extra.
+opensta_make_jobs: "{{ eda_make_jobs }}"
+opensta_force_rebuild: false

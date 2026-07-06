@@ -1,0 +1,22 @@
+---
+# bison (>= 3.2), flex and swig (with the Tcl backend) generate the parsers
+# and Tcl bindings at build time; Rocky 9's dnf copies are new enough, so no
+# explicit -DBISON_EXECUTABLE/-DFLEX_EXECUTABLE overrides are needed here
+# (unlike macOS, where the system bison is ancient).
+#
+# eigen3-devel is header-only linear algebra (EPEL). fmt-devel (EPEL): gcc 11's
+# libstdc++ has no std::format, so OpenSTA falls back to the fmt library —
+# installing it system-wide keeps OpenSTA's CMake from cloning fmt via
+# FetchContent mid-build (network access) and then installing that private
+# copy into the prefix, squatting on the canonical fmt paths.
+opensta_packages:
+  - bison
+  - cmake
+  - eigen3-devel
+  - flex
+  - fmt-devel
+  - swig
+  - tcl-devel
+  - zlib-devel
+
+opensta_cmake_args_extra: []

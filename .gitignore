@@ -1,3 +1,4 @@
+# MacPorts port-phase droppings (legacy tree; removed with it)
 Checksumming
 Configuring
 Extracting
@@ -6,9 +7,18 @@ PortIndex
 PortIndex.quick
 Verifying
 notes.txt
-.*
 distfiles/
 */work
 **/work
 THEORY.md
 
+# Dotfile clutter (was a blanket `.*`, which would hide .github/.ansible-lint etc.)
+.DS_Store
+.venv/
+.ansible/
+.cache/
+__pycache__/
+*.pyc
+
+# ansible-galaxy collection build artifact
+icanalytica-eda-*.tar.gz

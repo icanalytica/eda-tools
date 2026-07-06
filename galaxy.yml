@@ -1,0 +1,36 @@
+---
+namespace: icanalytica
+name: eda
+version: 0.1.0
+readme: README.md
+authors:
+  - icanalytica
+description: >-
+  Open-source EDA toolchain (sky130-capable) built from pinned sources into
+  /opt/eda on Rocky Linux and macOS workstations. One role per tool.
+license:
+  - MIT
+repository: https://github.com/icanalytica/eda-tools
+issues: https://github.com/icanalytica/eda-tools/issues
+tags:
+  - eda
+  - tools
+dependencies:
+  ansible.posix: ">=1.5.0"
+  community.general: ">=8.0.0"
+build_ignore:
+  # Legacy MacPorts tree — frozen for reference, removed in the final cleanup PR.
+  - aqua
+  - cad
+  - python
+  - science
+  - x11
+  - README-macports.md
+  # Local/dev artifacts
+  - distfiles
+  - .venv
+  - .molecule
+  - uv.lock
+  - pyproject.toml
+  - Makefile
+  - icanalytica-eda-*.tar.gz

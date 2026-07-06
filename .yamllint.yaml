@@ -1,0 +1,32 @@
+---
+extends: default
+
+ignore: |
+  .venv/
+  .ansible/
+  **/site-packages/**
+  **/__pycache__/**
+  node_modules/
+  .tox/
+  .molecule/
+  aqua/
+  cad/
+  python/
+  science/
+  x11/
+  distfiles/
+
+rules:
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  braces:
+    max-spaces-inside: 1
+    level: error
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+  line-length:
+    max: 160
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true

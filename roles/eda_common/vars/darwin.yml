@@ -1,0 +1,9 @@
+---
+# Compilers come from the Xcode Command Line Tools (asserted in darwin.yml);
+# Homebrew supplies the GNU autotools the source builds expect.
+eda_common_packages:
+  - autoconf
+  - automake
+  - git
+  - libtool
+  - pkg-config

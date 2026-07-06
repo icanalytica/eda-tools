@@ -1,0 +1,22 @@
+---
+# Base toolchain present before any tool role builds. Tool-specific build
+# deps (bison, cmake, tcl-devel, ...) live in each tool role's own vars.
+eda_common_packages:
+  - autoconf
+  - automake
+  - bzip2
+  - ca-certificates
+  - diffutils
+  - gcc
+  - gcc-c++
+  - git
+  - gzip
+  - libtool
+  - make
+  - patch
+  - pkgconf-pkg-config
+  - rsync
+  - tar
+  - unzip
+  - which
+  - xz

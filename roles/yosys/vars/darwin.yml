@@ -1,0 +1,15 @@
+---
+# The macOS system bison/flex are too old for the Verilog frontend grammar,
+# but yosys's Makefile auto-detects Homebrew and adds its keg paths itself,
+# so no explicit path overrides are needed here. zlib comes from the SDK;
+# python3 from the Xcode CLT is new enough for the build scripts and
+# yosys-smtbmc.
+yosys_packages:
+  - bison
+  - flex
+  - libffi
+  - libtommath
+  - readline
+  - tcl-tk
+
+yosys_make_config: clang

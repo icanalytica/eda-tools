@@ -1,0 +1,34 @@
+---
+# Yosys 0.66, built from the official release *source* tarball
+# (yosys-src.tar.gz): it bundles ABC (built and used from the bundled tree,
+# no network fetch or git during the build) and carries .gitcommit, so the
+# version string is correct without a git checkout. Bump yosys_version and
+# yosys_checksum together.
+yosys_version: "0.66"
+yosys_checksum: "sha256:ba567ea7fbb1287e996aef8f20fe902f6fd408593aa50cfaea8ae0c9015ab872"
+
+yosys_archive_name: "yosys-src-{{ yosys_version }}.tar.gz"
+yosys_upstream_url: "https://github.com/YosysHQ/yosys/releases/download/v{{ yosys_version }}/yosys-src.tar.gz"
+yosys_source_url: >-
+  {{ (eda_mirror_base ~ '/' ~ yosys_archive_name)
+     if (eda_mirror_base | default('') | length > 0)
+     else yosys_upstream_url }}
+
+yosys_build_root: "{{ eda_src_root }}/yosys"
+yosys_source_archive: "{{ yosys_build_root }}/{{ yosys_archive_name }}"
+# The tarball is flat (no top-level directory), so the build tasks create
+# this directory first and extract into it.
+yosys_source_dir: "{{ yosys_build_root }}/yosys-{{ yosys_version }}"
+yosys_install_stamp: "{{ yosys_build_root }}/.installed-{{ yosys_version }}"
+
+# PREFIX is baked into the binary's data path at build time, so it must be
+# identical for build and install. CONFIG (gcc vs clang) comes from
+# vars/<os_family>.yml as yosys_make_config. ENABLE_PYOSYS stays off: the
+# Python bindings only matter for OpenLane/LibreLane native mode, which is
+# out of scope.
+yosys_make_args:
+  - "PREFIX={{ eda_prefix }}"
+  - "CONFIG={{ yosys_make_config }}"
+
+yosys_make_jobs: "{{ eda_make_jobs }}"
+yosys_force_rebuild: false

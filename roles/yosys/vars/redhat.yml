@@ -1,0 +1,18 @@
+---
+# bison/flex generate the Verilog frontend parsers at build time. Linked
+# libraries per upstream: tcl, readline, zlib, libtommath (found via
+# pkg-config; the pkgconf base comes from eda_common), and libffi for the
+# DPI-call frontend (the macOS SDK bundles libffi, which is why the old
+# Portfile never listed it — Linux needs the devel package). python3 is
+# used by the build scripts and by the installed yosys-smtbmc at runtime.
+yosys_packages:
+  - bison
+  - flex
+  - libffi-devel
+  - libtommath-devel
+  - python3
+  - readline-devel
+  - tcl-devel
+  - zlib-devel
+
+yosys_make_config: gcc

@@ -6,10 +6,14 @@ eda_vendor_prefix: "{{ eda_prefix }}/vendor"
 eda_src_root: "{{ eda_prefix }}/src"
 eda_make_jobs: "{{ ansible_processor_vcpus | default(2) }}"
 
-# Optional base URL of a flat mirror holding the pinned source tarballs
-# (see the sources-* GitHub release on icanalytica/eda-tools). Empty means
-# each role fetches from its upstream URL; checksums verify either way.
-eda_mirror_base: ""
+# Flat mirror holding the pinned source tarballs (the add-only `sources`
+# release on icanalytica/eda-tools). This is the DEFAULT fetch source, not a
+# fallback: GitHub's auto-generated archive/ tarballs (cudd, OpenSTA, sby
+# pins) carry no checksum-stability guarantee — only uploaded release assets
+# do — so fetching upstream by default risks a fleet-wide checksum mismatch
+# whenever GitHub changes its archive generation (as in Jan 2023). Set to ""
+# to fetch each role's upstream URL instead; sha256 pins verify either way.
+eda_mirror_base: "https://github.com/icanalytica/eda-tools/releases/download/sources"
 
 # Set false when EPEL/CRB are managed elsewhere (e.g. a golden image).
 eda_manage_repos: true

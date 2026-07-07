@@ -58,10 +58,25 @@ Playbook-level knobs: `eda_prefix`, `eda_src_root`, `eda_make_jobs`,
 Per-role documentation lives in `roles/<name>/README.md`, including the
 upstream pin, its rationale, and the role's self-verification.
 
+## Source mirror
+
+Roles fetch their pinned tarballs from the add-only
+[`sources` release](https://github.com/icanalytica/eda-tools/releases/tag/sources)
+on this repo by default, not from upstream. GitHub's auto-generated
+`archive/` tarballs (the cudd, OpenSTA and sby pins) carry **no
+checksum-stability guarantee** — only uploaded release assets do — so
+upstream-by-default would risk a fleet-wide checksum mismatch whenever
+GitHub changes its archive generation (as happened in January 2023). The
+sha256 pins in each role authenticate the files, so the mirror needs no
+special trust. Policy: assets are only ever added, never replaced. Set
+`eda_mirror_base: ""` to fetch upstream, or point it at a `file://` path
+for offline installs.
+
 ## Design in one paragraph
 
-Tools build from pinned upstream tarballs (sha256-verified `get_url`, with a
-`file://`/mirror override) into the dedicated prefix `/opt/eda` — never into
+Tools build from pinned tarballs (sha256-verified `get_url`, mirrored as
+release assets, with `file://` override) into the dedicated prefix `/opt/eda`
+— never into
 `/usr` or Homebrew's prefix, so nothing fights the system package manager and
 there is no shared-prefix header shadowing (the problem that forced the old
 MacPorts tree's "deactivation gates"). Pins are exact — a version bump is

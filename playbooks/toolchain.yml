@@ -1,0 +1,18 @@
+---
+# Installs the required EDA toolchain (degs's set): yosys (bundled ABC),
+# sby, OpenSTA, cudd — plus netlistsvg unless eda_install_netlistsvg is
+# false. Meta-dependencies handle ordering: opensta pulls cudd, sby pulls
+# yosys, everything pulls eda_common.
+#
+# Run from a consuming control repo as:
+#   ansible-playbook icanalytica.eda.toolchain -l <hosts>
+# Target hosts via the eda_hosts var (default: the `eda` inventory group).
+# No play-level become: every role escalates per task where needed, and the
+# Homebrew tasks on macOS must NOT run as root.
+- name: Install EDA toolchain
+  hosts: "{{ eda_hosts | default('eda') }}"
+  roles:
+    - role: icanalytica.eda.opensta
+    - role: icanalytica.eda.sby
+    - role: icanalytica.eda.netlistsvg
+      when: eda_install_netlistsvg | default(true) | bool

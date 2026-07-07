@@ -1,0 +1,90 @@
+---
+- name: Ensure sby build root exists
+  ansible.builtin.file:
+    path: "{{ sby_build_root }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Stage sby tarball from controller
+  ansible.builtin.copy:
+    src: "{{ sby_source_url | urlsplit('path') }}"
+    dest: "{{ sby_source_archive }}"
+    mode: "0644"
+    force: false
+  when:
+    - (sby_source_url | urlsplit('scheme') | lower) == 'file'
+  become: true
+
+- name: Download sby source tarball
+  ansible.builtin.get_url:
+    url: "{{ sby_source_url }}"
+    dest: "{{ sby_source_archive }}"
+    mode: "0644"
+    checksum: "{{ sby_checksum }}"
+  when:
+    - (sby_source_url | urlsplit('scheme') | lower) != 'file'
+  become: true
+
+- name: Check sby install stamp
+  ansible.builtin.stat:
+    path: "{{ sby_install_stamp }}"
+  register: sby_stamp_stat
+  become: true
+
+- name: Determine if sby install is needed
+  ansible.builtin.set_fact:
+    sby_build_needed: >-
+      {{ (not sby_stamp_stat.stat.exists) or (sby_force_rebuild | bool) }}
+
+- name: Remove previous sby extraction
+  ansible.builtin.command: "rm -rf {{ sby_source_dir }}"
+  args:
+    removes: "{{ sby_source_dir }}"
+  when: sby_build_needed | bool
+  become: true
+
+- name: Extract sby source
+  ansible.builtin.unarchive:
+    src: "{{ sby_source_archive }}"
+    dest: "{{ sby_build_root }}"
+    remote_src: true
+    creates: "{{ sby_source_dir }}/Makefile"
+  when: sby_build_needed | bool
+  become: true
+
+# The Makefile derives its version from .gittag (falling back to
+# `git describe`, which fails in a tarball). Provide a clean .gittag so no
+# git is invoked.
+- name: Write sby .gittag
+  ansible.builtin.copy:
+    content: "sby-{{ sby_version }}\n"
+    dest: "{{ sby_source_dir }}/.gittag"
+    mode: "0644"
+  when: sby_build_needed | bool
+  become: true
+
+- name: Clear sby install stamp before reinstall
+  ansible.builtin.file:
+    path: "{{ sby_install_stamp }}"
+    state: absent
+  when: sby_build_needed | bool
+  become: true
+
+- name: Install sby
+  ansible.builtin.command:
+    cmd: "make install PREFIX={{ eda_prefix }}"
+    chdir: "{{ sby_source_dir }}"
+  args:
+    creates: "{{ sby_install_stamp }}"
+  when: sby_build_needed | bool
+  become: true
+
+- name: Record sby install stamp
+  ansible.builtin.copy:
+    content: "{{ sby_version }} {{ sby_commit }}\n"
+    dest: "{{ sby_install_stamp }}"
+    mode: "0644"
+    force: false
+  when: sby_build_needed | bool
+  become: true

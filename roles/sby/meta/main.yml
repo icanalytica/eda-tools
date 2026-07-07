@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  author: icanalytica
+  description: SymbiYosys (sby) formal verification front-end, pinned commit install
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+    - name: MacOSX
+      versions:
+        - all
+
+dependencies:
+  # yosys pulls in eda_common transitively; sby drives yosys and
+  # yosys-smtbmc at runtime and its verification needs them installed.
+  - role: icanalytica.eda.yosys

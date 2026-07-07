@@ -1,0 +1,24 @@
+---
+# sby (SymbiYosys) has no recent version tags aligned with current yosys, so
+# the source is pinned to a specific main commit. It is loosely coupled to
+# yosys (it drives `yosys` and `yosys-smtbmc` over PATH), so it works with
+# our yosys 0.66. sby_version is the date-based version the MacPorts port
+# assigned to this commit; it feeds the .gittag file (see tasks) and the
+# install stamp. When updating, bump commit, version and checksum together.
+sby_version: "20260616"
+sby_commit: "d3e72d26e8634bca4ca16f3e4d84331481f06ab6"
+sby_checksum: "sha256:db9ed202a0ee56466c7b819011581e141b4bfb10dc8a915d6c2a95847bfdc547"
+
+sby_archive_name: "sby-{{ sby_commit }}.tar.gz"
+sby_upstream_url: "https://github.com/YosysHQ/sby/archive/{{ sby_commit }}.tar.gz"
+sby_source_url: >-
+  {{ (eda_mirror_base ~ '/' ~ sby_archive_name)
+     if (eda_mirror_base | default('') | length > 0)
+     else sby_upstream_url }}
+
+sby_build_root: "{{ eda_src_root }}/sby"
+sby_source_archive: "{{ sby_build_root }}/{{ sby_archive_name }}"
+sby_source_dir: "{{ sby_build_root }}/sby-{{ sby_commit }}"
+sby_install_stamp: "{{ sby_build_root }}/.installed-{{ sby_commit }}"
+
+sby_force_rebuild: false

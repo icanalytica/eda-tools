@@ -1,0 +1,9 @@
+---
+# sby is pure Python (noarch) — no build toolchain needed. z3 (EPEL) is the
+# SMT solver the verification flow drives via yosys-smtbmc; python3 runs the
+# installed sby itself (#!/usr/bin/env python3), which imports click at this
+# commit (a dependency newer than the MacPorts port's metadata).
+sby_packages:
+  - python3
+  - python3-click
+  - z3

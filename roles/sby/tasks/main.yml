@@ -1,0 +1,132 @@
+---
+- name: Ensure supported OS family
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] in ['RedHat', 'Darwin']
+    fail_msg: >-
+      icanalytica.eda.sby supports RedHat-family Linux and macOS.
+      Detected: {{ ansible_facts['os_family'] }}.
+
+- name: Include OS family vars
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] | lower }}.yml"
+
+- name: Install sby dependencies (dnf)
+  ansible.builtin.dnf:
+    name: "{{ sby_packages }}"
+    state: present
+  become: true
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - sby_packages | length > 0
+
+# Homebrew refuses to run as root, so no become here.
+- name: Install sby dependencies (Homebrew)
+  community.general.homebrew:
+    name: "{{ sby_packages }}"
+    state: present
+  when:
+    - ansible_facts['os_family'] == 'Darwin'
+    - sby_packages | length > 0
+
+# sby imports click at this commit; on Linux it comes from python3-click
+# (dnf), but there is no Homebrew equivalent visible to `env python3`, so
+# install it per-user for whichever python3 leads PATH.
+- name: Install click for sby (pip --user)
+  ansible.builtin.pip:
+    name: click
+    extra_args: --user
+  when: ansible_facts['os_family'] == 'Darwin'
+
+- name: Install sby
+  ansible.builtin.include_tasks: sby.yml
+
+# Verification runs two real formal tasks through the whole stack
+# (sby -> yosys -> yosys-smtbmc -> z3): a true assertion must PASS and a
+# false one must FAIL. A solver that always "passes" (e.g. a broken z3
+# hookup silently proving nothing) is caught by the second task.
+- name: Verify sby
+  block:
+    - name: Create sby verify directory
+      ansible.builtin.file:
+        path: "{{ sby_build_root }}/verify"
+        state: directory
+        mode: "0755"
+      become: true
+
+    - name: Write sby smoke-test design
+      ansible.builtin.copy:
+        dest: "{{ sby_build_root }}/verify/test.sv"
+        mode: "0644"
+        content: |
+          module test (input clk);
+            reg [3:0] counter = 0;
+            always @(posedge clk) begin
+              if (counter == 4'd10) counter <= 0;
+              else counter <= counter + 1'b1;
+            end
+          `ifdef FAIL_CASE
+            always @* assert (counter != 4'd5);
+          `else
+            always @* assert (counter <= 4'd10);
+          `endif
+          endmodule
+      become: true
+
+    - name: Write sby task files
+      ansible.builtin.copy:
+        dest: "{{ sby_build_root }}/verify/{{ item.name }}.sby"
+        mode: "0644"
+        content: |
+          [options]
+          mode bmc
+          depth 12
+
+          [engines]
+          smtbmc z3
+
+          [script]
+          {{ item.defines }}
+          read -formal test.sv
+          prep -top test
+
+          [files]
+          test.sv
+      loop:
+        - {name: smoke_pass, defines: ""}
+        - {name: smoke_fail, defines: "verilog_defines -DFAIL_CASE"}
+      loop_control:
+        label: "{{ item.name }}"
+      become: true
+
+    - name: Run passing sby task
+      ansible.builtin.command: "{{ eda_prefix }}/bin/sby -f smoke_pass.sby"
+      args:
+        chdir: "{{ sby_build_root }}/verify"
+      environment:
+        PATH: "{{ eda_prefix }}/bin:{{ ansible_env.PATH }}"
+      register: sby_pass
+      changed_when: false
+      become: true
+
+    - name: Run failing sby task
+      ansible.builtin.command: "{{ eda_prefix }}/bin/sby -f smoke_fail.sby"
+      args:
+        chdir: "{{ sby_build_root }}/verify"
+      environment:
+        PATH: "{{ eda_prefix }}/bin:{{ ansible_env.PATH }}"
+      register: sby_fail
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: Assert sby verdicts are correct
+      ansible.builtin.assert:
+        that:
+          - sby_pass.rc == 0
+          - "'PASS' in sby_pass.stdout"
+          - sby_fail.rc != 0
+          - "'FAIL' in sby_fail.stdout"
+        fail_msg: >-
+          sby smoke tests gave wrong verdicts —
+          pass task rc={{ sby_pass.rc }}, fail task rc={{ sby_fail.rc }}.
+          Check that yosys, yosys-smtbmc and z3 are all functional.

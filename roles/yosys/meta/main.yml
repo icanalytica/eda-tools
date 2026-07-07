@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  author: icanalytica
+  description: Yosys open synthesis suite, pinned release-src build with bundled ABC
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+    - name: MacOSX
+      versions:
+        - all
+
+dependencies:
+  - role: icanalytica.eda.eda_common

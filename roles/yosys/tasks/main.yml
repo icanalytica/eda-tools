@@ -1,0 +1,93 @@
+---
+- name: Ensure supported OS family
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] in ['RedHat', 'Darwin']
+    fail_msg: >-
+      icanalytica.eda.yosys supports RedHat-family Linux and macOS.
+      Detected: {{ ansible_facts['os_family'] }}.
+
+- name: Include OS family vars
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] | lower }}.yml"
+
+- name: Install yosys build dependencies (dnf)
+  ansible.builtin.dnf:
+    name: "{{ yosys_packages }}"
+    state: present
+  become: true
+  when:
+    - ansible_facts['os_family'] == 'RedHat'
+    - yosys_packages | length > 0
+
+# Homebrew refuses to run as root, so no become here.
+- name: Install yosys build dependencies (Homebrew)
+  community.general.homebrew:
+    name: "{{ yosys_packages }}"
+    state: present
+  when:
+    - ansible_facts['os_family'] == 'Darwin'
+    - yosys_packages | length > 0
+
+- name: Build and install yosys
+  ansible.builtin.include_tasks: yosys.yml
+
+# Verification synthesizes a real design: `synth` runs the full generic flow
+# including the bundled ABC, so a broken ABC integration (degs's core
+# requirement: the release tarball's bundled, statically-tied ABC) fails the
+# play here, not on first real use.
+- name: Verify yosys
+  block:
+    - name: Check yosys version
+      ansible.builtin.command: "{{ eda_prefix }}/bin/yosys -V"
+      register: yosys_version_out
+      changed_when: false
+
+    - name: Assert yosys reports the pinned version
+      ansible.builtin.assert:
+        that:
+          - "'Yosys ' ~ yosys_version in yosys_version_out.stdout"
+        fail_msg: >-
+          Expected yosys -V to report {{ yosys_version }},
+          got: {{ yosys_version_out.stdout }}
+
+    - name: Create yosys verify directory
+      ansible.builtin.file:
+        path: "{{ yosys_build_root }}/verify"
+        state: directory
+        mode: "0755"
+      become: true
+
+    - name: Write yosys smoke-test design
+      ansible.builtin.copy:
+        dest: "{{ yosys_build_root }}/verify/counter.v"
+        mode: "0644"
+        content: |
+          module counter (input clk, input rst, output reg [7:0] q);
+            always @(posedge clk) begin
+              if (rst) q <= 8'd0;
+              else q <= q + 8'd1;
+            end
+          endmodule
+      become: true
+
+    - name: Synthesize the smoke-test design (exercises bundled ABC)
+      ansible.builtin.command: >-
+        {{ eda_prefix }}/bin/yosys -p
+        "read_verilog counter.v; synth -top counter; stat"
+      args:
+        chdir: "{{ yosys_build_root }}/verify"
+      register: yosys_smoke
+      changed_when: false
+      become: true
+
+    - name: Assert synthesis produced cells
+      ansible.builtin.assert:
+        that:
+          - yosys_smoke.rc == 0
+          - "'=== counter ===' in yosys_smoke.stdout"
+          # yosys 0.66's stat prints a count table ("22 cells"), not the old
+          # "Number of cells" wording.
+          - yosys_smoke.stdout is search('[1-9][0-9]* cells')
+        fail_msg: >-
+          yosys {{ yosys_version }} installed but failed to synthesize the
+          smoke-test counter: {{ yosys_smoke.stdout }} {{ yosys_smoke.stderr }}

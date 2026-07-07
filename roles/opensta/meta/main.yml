@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  author: icanalytica
+  description: OpenSTA gate-level static timing analyzer, pinned commit build with CUDD
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+    - name: MacOSX
+      versions:
+        - all
+
+dependencies:
+  # cudd pulls in eda_common transitively; listed here because the build is
+  # configured with -DCUDD_DIR and fails without cudd installed first.
+  - role: icanalytica.eda.cudd

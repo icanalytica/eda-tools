@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  roles:
+    # Meta-dependencies pull in cudd and eda_common first.
+    - role: icanalytica.eda.opensta

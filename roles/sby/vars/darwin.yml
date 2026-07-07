@@ -1,0 +1,6 @@
+---
+# sby is pure Python (noarch); the interpreter comes from `env python3`
+# (Xcode CLT or Homebrew, whichever leads PATH — sby needs only 3.8+).
+# z3 is the SMT solver the verification flow drives via yosys-smtbmc.
+sby_packages:
+  - z3

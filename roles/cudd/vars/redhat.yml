@@ -1,0 +1,4 @@
+---
+# CUDD needs nothing beyond the eda_common base toolchain: the refs/tags
+# tarball ships a committed ./configure, so not even autotools regeneration.
+cudd_packages: []

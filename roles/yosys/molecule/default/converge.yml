@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  vars:
+    # Docker Desktop exposes all host CPUs but far less RAM; a full-width
+    # parallel C++ build gets OOM-killed (rc 137). Real hosts keep the
+    # vCPU-count default.
+    eda_make_jobs: 4
+  roles:
+    - role: icanalytica.eda.yosys

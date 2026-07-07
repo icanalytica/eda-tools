@@ -1,0 +1,22 @@
+---
+# The macOS system bison (2.3) and flex are far too old for OpenSTA's grammar
+# files, so Homebrew's keg-only copies are pointed at explicitly below.
+opensta_packages:
+  - bison
+  - cmake
+  - eigen
+  - flex
+  - fmt
+  - swig
+  - tcl-tk
+
+opensta_brew_prefix: >-
+  {{ '/opt/homebrew' if ansible_facts['architecture'] == 'arm64' else '/usr/local' }}
+
+# OpenSTA's bundled cmake/FindTCL.cmake hard-codes Homebrew search paths on
+# macOS and sets NO_DEFAULT_PATH, but Homebrew's tcl-tk is keg-only, so point
+# TCL_LIB_PATHS at the keg's lib dir explicitly.
+opensta_cmake_args_extra:
+  - "-DBISON_EXECUTABLE={{ opensta_brew_prefix }}/opt/bison/bin/bison"
+  - "-DFLEX_EXECUTABLE={{ opensta_brew_prefix }}/opt/flex/bin/flex"
+  - "-DTCL_LIB_PATHS={{ opensta_brew_prefix }}/opt/tcl-tk/lib"

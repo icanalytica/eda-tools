@@ -1,0 +1,112 @@
+---
+- name: Ensure opensta build root exists
+  ansible.builtin.file:
+    path: "{{ opensta_build_root }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Stage opensta tarball from controller
+  ansible.builtin.copy:
+    src: "{{ opensta_source_url | urlsplit('path') }}"
+    dest: "{{ opensta_source_archive }}"
+    mode: "0644"
+    force: false
+  when:
+    - (opensta_source_url | urlsplit('scheme') | lower) == 'file'
+  become: true
+
+- name: Download opensta source tarball
+  ansible.builtin.get_url:
+    url: "{{ opensta_source_url }}"
+    dest: "{{ opensta_source_archive }}"
+    mode: "0644"
+    checksum: "{{ opensta_checksum }}"
+  when:
+    - (opensta_source_url | urlsplit('scheme') | lower) != 'file'
+  become: true
+
+- name: Check opensta install stamp
+  ansible.builtin.stat:
+    path: "{{ opensta_install_stamp }}"
+  register: opensta_stamp_stat
+  become: true
+
+- name: Determine if opensta build is needed
+  ansible.builtin.set_fact:
+    opensta_build_needed: >-
+      {{ (not opensta_stamp_stat.stat.exists) or (opensta_force_rebuild | bool) }}
+
+- name: Remove previous opensta extraction
+  ansible.builtin.command: "rm -rf {{ opensta_source_dir }}"
+  args:
+    removes: "{{ opensta_source_dir }}"
+  when: opensta_build_needed | bool
+  become: true
+
+- name: Extract opensta source
+  ansible.builtin.unarchive:
+    src: "{{ opensta_source_archive }}"
+    dest: "{{ opensta_build_root }}"
+    remote_src: true
+    creates: "{{ opensta_source_dir }}/CMakeLists.txt"
+  when: opensta_build_needed | bool
+  become: true
+
+# OpenSTA uses C++20 three-way comparison (operator<=>) on std::string in
+# network/Network.cc. The libc++ in older macOS SDKs (e.g. the Ventura
+# Command Line Tools) lacks operator<=> for std::basic_string, so the build
+# fails. Replace those sites with std::string::compare(), which has identical
+# sign semantics. Rocky 9's libstdc++ is fine, hence Darwin-only.
+- name: Apply macOS string-spaceship patch
+  ansible.posix.patch:
+    src: patch-Network-string-spaceship.diff
+    basedir: "{{ opensta_source_dir }}"
+    strip: 0
+  when:
+    - opensta_build_needed | bool
+    - ansible_facts['os_family'] == 'Darwin'
+  become: true
+
+- name: Configure opensta
+  ansible.builtin.command: >-
+    cmake -S . -B build
+    {{ (opensta_cmake_args + opensta_cmake_args_extra) | join(' ') }}
+  args:
+    chdir: "{{ opensta_source_dir }}"
+    creates: "{{ opensta_source_dir }}/build/CMakeCache.txt"
+  when: opensta_build_needed | bool
+  become: true
+
+- name: Build opensta
+  ansible.builtin.command: "cmake --build build -j {{ opensta_make_jobs }}"
+  args:
+    chdir: "{{ opensta_source_dir }}"
+    creates: "{{ opensta_source_dir }}/build/sta"
+  when: opensta_build_needed | bool
+  become: true
+
+- name: Clear opensta install stamp before reinstall
+  ansible.builtin.file:
+    path: "{{ opensta_install_stamp }}"
+    state: absent
+  when: opensta_build_needed | bool
+  become: true
+
+- name: Install opensta
+  ansible.builtin.command:
+    cmd: cmake --install build
+    chdir: "{{ opensta_source_dir }}"
+  args:
+    creates: "{{ opensta_install_stamp }}"
+  when: opensta_build_needed | bool
+  become: true
+
+- name: Record opensta install stamp
+  ansible.builtin.copy:
+    content: "{{ opensta_version }} {{ opensta_commit }}\n"
+    dest: "{{ opensta_install_stamp }}"
+    mode: "0644"
+    force: false
+  when: opensta_build_needed | bool
+  become: true

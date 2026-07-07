@@ -1,0 +1,13 @@
+---
+- name: Prepare instance
+  hosts: all
+  become: true
+  tasks:
+    - name: Install Python and sudo
+      ansible.builtin.dnf:
+        name:
+          - python3
+          - sudo
+          - ca-certificates
+          - rsync
+        update_cache: true

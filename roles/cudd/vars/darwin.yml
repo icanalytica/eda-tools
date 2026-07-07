@@ -1,0 +1,4 @@
+---
+# Compilers come from the Xcode Command Line Tools (asserted by eda_common);
+# the tarball ships a committed ./configure, so no extra Homebrew packages.
+cudd_packages: []

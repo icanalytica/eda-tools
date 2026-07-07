@@ -1,0 +1,20 @@
+---
+profile: min
+project_dir: .
+exclude_paths:
+  - .venv/
+  - .ansible/
+  - '**/site-packages/**'
+  - '**/__pycache__/**'
+  - node_modules/
+  - build/
+  - dist/
+  - .tox/
+  - .molecule/
+  # Legacy MacPorts tree (Tcl Portfiles, not Ansible content)
+  - aqua/
+  - cad/
+  - python/
+  - science/
+  - x11/
+  - distfiles/

@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  author: icanalytica
+  description: Shared prefix, repos, and base toolchain for the icanalytica.eda collection
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+    - name: MacOSX
+      versions:
+        - all
+
+dependencies: []

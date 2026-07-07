@@ -1,0 +1,7 @@
+---
+- name: Ldconfig
+  ansible.builtin.command: ldconfig
+  become: true
+  changed_when: true
+  when: ansible_facts['os_family'] == 'RedHat'
+  listen: ldconfig

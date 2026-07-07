@@ -1,0 +1,42 @@
+---
+- name: Check for Xcode Command Line Tools
+  ansible.builtin.command: xcode-select -p
+  register: eda_common_clt
+  changed_when: false
+  failed_when: false
+
+- name: Assert Xcode Command Line Tools installed
+  ansible.builtin.assert:
+    that:
+      - eda_common_clt.rc == 0
+    fail_msg: >-
+      Xcode Command Line Tools are required. Run: xcode-select --install
+
+- name: Check for Homebrew
+  ansible.builtin.command: brew --prefix
+  register: eda_common_brew
+  changed_when: false
+  failed_when: false
+
+- name: Assert Homebrew installed
+  ansible.builtin.assert:
+    that:
+      - eda_common_brew.rc == 0
+    fail_msg: >-
+      Homebrew is required for dependency packages. See https://brew.sh
+
+# Deliberately no become: brew refuses to run as root.
+- name: Install base toolchain packages (Homebrew)
+  community.general.homebrew:
+    name: "{{ eda_common_packages }}"
+    state: present
+
+- name: Add EDA prefix to PATH via /etc/paths.d
+  ansible.builtin.copy:
+    dest: /etc/paths.d/50-eda
+    owner: root
+    group: wheel
+    mode: "0644"
+    content: |
+      {{ eda_prefix }}/bin
+  become: true

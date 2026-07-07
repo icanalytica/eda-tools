@@ -1,0 +1,57 @@
+---
+- name: Ensure dnf config-manager is available
+  ansible.builtin.dnf:
+    name: dnf-plugins-core
+    state: present
+    update_cache: true
+  become: true
+  when: eda_manage_repos
+
+- name: Enable CRB repository (EL 9+)
+  ansible.builtin.command: dnf config-manager --set-enabled crb
+  become: true
+  changed_when: false
+  when:
+    - eda_manage_repos
+    - ansible_facts['distribution_major_version'] | int >= 9
+
+- name: Install EPEL repository
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+  become: true
+  when: eda_manage_repos
+
+- name: Install base toolchain packages
+  ansible.builtin.dnf:
+    name: "{{ eda_common_packages }}"
+    state: present
+    update_cache: true
+  become: true
+
+- name: Add EDA prefix to default PATH
+  ansible.builtin.copy:
+    dest: /etc/profile.d/eda.sh
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by icanalytica.eda (eda_common)
+      case ":$PATH:" in
+        *":{{ eda_prefix }}/bin:"*) ;;
+        *) PATH="{{ eda_prefix }}/bin:$PATH" ;;
+      esac
+      export PATH
+  become: true
+
+- name: Register EDA libraries with the dynamic linker
+  ansible.builtin.copy:
+    dest: /etc/ld.so.conf.d/eda.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      {{ eda_prefix }}/lib
+      {{ eda_prefix }}/lib64
+  become: true
+  notify: ldconfig

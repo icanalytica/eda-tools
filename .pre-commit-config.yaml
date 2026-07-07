@@ -1,0 +1,39 @@
+---
+exclude: |
+  (?x)^(
+    aqua/|
+    cad/|
+    python/|
+    science/|
+    x11/|
+    distfiles/|
+    README-macports\.md$
+  )
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+  - repo: https://github.com/ansible/ansible-lint
+    rev: v26.1.1
+    hooks:
+      - id: ansible-lint
+        additional_dependencies:
+          - ansible-core==2.20.1
+        files: ^roles/
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        files: ^roles/.*/molecule/.*/tests/.*\.py$
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        files: ^roles/.*/molecule/.*/tests/.*\.py$
